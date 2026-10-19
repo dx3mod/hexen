@@ -74,7 +74,7 @@ let decode_to_buffer hex buffer =
   decode_substring_to_buffer hex 0 (String.length hex) buffer
 
 let decode_substring hex off len =
-  let bytes = Bytes.create (String.length hex / 2) in
+  let bytes = Bytes.create (len / 2) in
   decode_into hex off bytes 0 len;
   Bytes.unsafe_to_string bytes
 
