@@ -1,0 +1,6 @@
+# Artifacts
+_build/
+*.install
+# Editors
+*.merlin
+.vscode/
