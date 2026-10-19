@@ -7,25 +7,35 @@
 
 val encode : ?uppercase:bool -> string -> string
 (** [encode ?uppercase source] encodes the [source] string to new hexadecimal
-    string. *)
+    string.
+
+    @raise Invalid_argument *)
 
 val encode_substring : ?uppercase:bool -> string -> int -> int -> string
 (** [encode_substring ?uppercase source off len] encodes the [source] substring
-    to new hexadecimal string. *)
+    to new hexadecimal string.
+
+    @raise Invalid_argument *)
 
 val encode_to_buffer : ?uppercase:bool -> string -> Buffer.t -> unit
 (** [encode_to_buffer ?uppercase source buffer] encodes the [source] string to
-    the [buffer]. *)
+    the [buffer].
+
+    @raise Invalid_argument *)
 
 val encode_substring_to_buffer :
   ?uppercase:bool -> string -> int -> int -> Buffer.t -> unit
 (** [encode_substring_to_buffer ?uppercase source off len buffer] encodes the
-    [source] substring to the [buffer]. *)
+    [source] substring to the [buffer].
+
+    @raise Invalid_argument *)
 
 val encode_into :
   ?uppercase:bool -> string -> int -> bytes -> int -> int -> unit
 (** [encode_into ?uppercase src src_off dst dst_off len] encodes the [src]
-    substring to the [dst] bytes range. *)
+    substring to the [dst] bytes range.
+
+    @raise Invalid_argument *)
 
 (** {2 Decode} *)
 

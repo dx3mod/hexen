@@ -1,4 +1,4 @@
-(* test_hexen.ml *)
+[@@@ai_generated]
 
 (* ==================== encode ==================== *)
 module Test_encode = struct
@@ -66,6 +66,22 @@ module Test_encode_substring = struct
 
   let test_single_byte () =
     Alcotest.(check string "single" "6c" (Hexen.encode_substring "hello" 2 1))
+
+  (* NEW: проверки диапазона источника *)
+  let test_negative_offset () =
+    Alcotest.(
+      check_raises "neg off" (Invalid_argument "source range out of bounds")
+        (fun () -> ignore (Hexen.encode_substring "hello" (-1) 3)))
+
+  let test_negative_length () =
+    Alcotest.(
+      check_raises "neg len" (Invalid_argument "source range out of bounds")
+        (fun () -> ignore (Hexen.encode_substring "hello" 0 (-1))))
+
+  let test_offset_plus_length_exceeds () =
+    Alcotest.(
+      check_raises "too long" (Invalid_argument "source range out of bounds")
+        (fun () -> ignore (Hexen.encode_substring "hello" 3 5)))
 end
 
 (* ==================== encode_to_buffer ==================== *)
@@ -121,6 +137,33 @@ module Test_encode_substring_to_buffer = struct
     Buffer.add_string buf "> ";
     Hexen.encode_substring_to_buffer "XXabcYY" 2 3 buf;
     Alcotest.(check string "appended" "> 616263" (Buffer.contents buf))
+
+  (* NEW: проверки диапазона источника *)
+  let test_negative_offset () =
+    let buf = Buffer.create 16 in
+    Alcotest.(
+      check_raises "neg off" (Invalid_argument "source range out of bounds")
+        (fun () -> Hexen.encode_substring_to_buffer "hello" (-1) 3 buf))
+
+  let test_negative_length () =
+    let buf = Buffer.create 16 in
+    Alcotest.(
+      check_raises "neg len" (Invalid_argument "source range out of bounds")
+        (fun () -> Hexen.encode_substring_to_buffer "hello" 0 (-1) buf))
+
+  let test_offset_plus_length_exceeds () =
+    let buf = Buffer.create 16 in
+    Alcotest.(
+      check_raises "too long" (Invalid_argument "source range out of bounds")
+        (fun () -> Hexen.encode_substring_to_buffer "hello" 3 5 buf))
+
+  (* NEW: буфер не изменяется при ошибке *)
+  let test_buffer_untouched_on_error () =
+    let buf = Buffer.create 16 in
+    Buffer.add_string buf "keep";
+    (try Hexen.encode_substring_to_buffer "hello" (-1) 3 buf
+     with Invalid_argument _ -> ());
+    Alcotest.(check string "buffer untouched" "keep" (Buffer.contents buf))
 end
 
 (* ==================== encode_into ==================== *)
@@ -159,6 +202,55 @@ module Test_encode_into = struct
     let dst = Bytes.create 2 in
     Hexen.encode_into "XaX" 1 dst 0 1;
     Alcotest.(check string "one byte" "61" (Bytes.to_string dst))
+
+  (* NEW: диапазон источника *)
+  let test_negative_source_offset () =
+    let dst = Bytes.make 20 'X' in
+    Alcotest.(
+      check_raises "neg src off" (Invalid_argument "source range out of bounds")
+        (fun () -> Hexen.encode_into "hello" (-1) dst 0 3))
+
+  let test_negative_length () =
+    let dst = Bytes.make 20 'X' in
+    Alcotest.(
+      check_raises "neg len" (Invalid_argument "source range out of bounds")
+        (fun () -> Hexen.encode_into "hello" 0 dst 0 (-1)))
+
+  let test_source_too_short () =
+    let dst = Bytes.make 20 'X' in
+    Alcotest.(
+      check_raises "src too short"
+        (Invalid_argument "source range out of bounds") (fun () ->
+          Hexen.encode_into "hi" 0 dst 0 3))
+
+  (* NEW: диапазон приёмника *)
+  let test_destination_too_small () =
+    let dst = Bytes.make 4 'X' in
+    Alcotest.(
+      check_raises "dst too small"
+        (Invalid_argument "destination buffer too small") (fun () ->
+          Hexen.encode_into "hello" 0 dst 0 5))
+
+  let test_destination_negative_offset () =
+    let dst = Bytes.make 20 'X' in
+    Alcotest.(
+      check_raises "neg dst off"
+        (Invalid_argument "destination buffer too small") (fun () ->
+          Hexen.encode_into "hello" 0 dst (-1) 5))
+
+  (* NEW: порядок проверок — источник раньше приёмника *)
+  let test_source_error_wins_over_destination_error () =
+    let dst = Bytes.make 4 'X' in
+    Alcotest.(
+      check_raises "src error first"
+        (Invalid_argument "source range out of bounds") (fun () ->
+          Hexen.encode_into "hi" 0 dst 0 3))
+
+  (* NEW: dst не изменяется при ошибке *)
+  let test_destination_untouched_on_error () =
+    let dst = Bytes.make 4 'X' in
+    (try Hexen.encode_into "hello" 0 dst 0 5 with Invalid_argument _ -> ());
+    Alcotest.(check string "dst untouched" "XXXX" (Bytes.to_string dst))
 end
 
 (* ==================== decode ==================== *)
@@ -244,6 +336,28 @@ module Test_decode_substring = struct
     Alcotest.(
       check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
           ignore (Hexen.decode_substring "6z" 0 2)))
+
+  (* NEW: диапазон hex-строки *)
+  let test_negative_offset () =
+    Alcotest.(
+      check_raises "neg off" (Invalid_argument "hex range out of bounds")
+        (fun () -> ignore (Hexen.decode_substring "68656c6c6f" (-1) 4)))
+
+  let test_negative_length () =
+    Alcotest.(
+      check_raises "neg len" (Invalid_argument "hex range out of bounds")
+        (fun () -> ignore (Hexen.decode_substring "68656c6c6f" 0 (-2))))
+
+  let test_offset_plus_length_exceeds () =
+    Alcotest.(
+      check_raises "too long" (Invalid_argument "hex range out of bounds")
+        (fun () -> ignore (Hexen.decode_substring "68656c6c6f" 5 10)))
+
+  (* NEW: ошибка диапазона проверяется раньше нечётной длины *)
+  let test_range_error_wins_over_odd_length () =
+    Alcotest.(
+      check_raises "range first" (Invalid_argument "hex range out of bounds")
+        (fun () -> ignore (Hexen.decode_substring "abc" 0 5)))
 end
 
 (* ==================== decode_to_buffer ==================== *)
@@ -323,6 +437,33 @@ module Test_decode_substring_to_buffer = struct
     Alcotest.(
       check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
           Hexen.decode_substring_to_buffer "7z" 0 2 buf))
+
+  (* NEW: диапазон hex-строки *)
+  let test_negative_offset () =
+    let buf = Buffer.create 16 in
+    Alcotest.(
+      check_raises "neg off" (Invalid_argument "hex range out of bounds")
+        (fun () -> Hexen.decode_substring_to_buffer "68656c6c6f" (-1) 4 buf))
+
+  let test_negative_length () =
+    let buf = Buffer.create 16 in
+    Alcotest.(
+      check_raises "neg len" (Invalid_argument "hex range out of bounds")
+        (fun () -> Hexen.decode_substring_to_buffer "68656c6c6f" 0 (-2) buf))
+
+  let test_offset_plus_length_exceeds () =
+    let buf = Buffer.create 16 in
+    Alcotest.(
+      check_raises "too long" (Invalid_argument "hex range out of bounds")
+        (fun () -> Hexen.decode_substring_to_buffer "68656c6c6f" 5 10 buf))
+
+  (* NEW: буфер не изменяется при ошибке *)
+  let test_buffer_untouched_on_error () =
+    let buf = Buffer.create 16 in
+    Buffer.add_string buf "keep";
+    (try Hexen.decode_substring_to_buffer "68656c6c6f" (-1) 4 buf
+     with Invalid_argument _ -> ());
+    Alcotest.(check string "buffer untouched" "keep" (Buffer.contents buf))
 end
 
 (* ==================== decode_into ==================== *)
@@ -367,6 +508,54 @@ module Test_decode_into = struct
     Alcotest.(
       check_raises "odd" (Invalid_argument "leftover byte in hex string")
         (fun () -> Hexen.decode_into "abc" 0 dst 0 3))
+
+  (* NEW: диапазон hex-строки *)
+  let test_negative_hex_offset () =
+    let dst = Bytes.make 10 'X' in
+    Alcotest.(
+      check_raises "neg hex off" (Invalid_argument "hex range out of bounds")
+        (fun () -> Hexen.decode_into "68656c6c6f" (-1) dst 0 4))
+
+  let test_negative_length () =
+    let dst = Bytes.make 10 'X' in
+    Alcotest.(
+      check_raises "neg len" (Invalid_argument "hex range out of bounds")
+        (fun () -> Hexen.decode_into "68656c6c6f" 0 dst 0 (-2)))
+
+  let test_hex_too_short () =
+    let dst = Bytes.make 10 'X' in
+    Alcotest.(
+      check_raises "hex too short" (Invalid_argument "hex range out of bounds")
+        (fun () -> Hexen.decode_into "68" 0 dst 0 4))
+
+  (* NEW: диапазон приёмника *)
+  let test_destination_too_small () =
+    let dst = Bytes.make 2 'X' in
+    Alcotest.(
+      check_raises "dst too small"
+        (Invalid_argument "destination buffer too small") (fun () ->
+          Hexen.decode_into "68656c6c6f" 0 dst 0 10))
+
+  let test_destination_negative_offset () =
+    let dst = Bytes.make 10 'X' in
+    Alcotest.(
+      check_raises "neg dst off"
+        (Invalid_argument "destination buffer too small") (fun () ->
+          Hexen.decode_into "68656c6c6f" 0 dst (-1) 10))
+
+  (* NEW: порядок проверок — чётность len раньше ёмкости dst *)
+  let test_odd_length_wins_over_destination_error () =
+    let dst = Bytes.make 1 'X' in
+    Alcotest.(
+      check_raises "odd first" (Invalid_argument "leftover byte in hex string")
+        (fun () -> Hexen.decode_into "abc" 0 dst 0 3))
+
+  (* NEW: dst не изменяется при ошибке *)
+  let test_destination_untouched_on_error () =
+    let dst = Bytes.make 2 'X' in
+    (try Hexen.decode_into "68656c6c6f" 0 dst 0 10
+     with Invalid_argument _ -> ());
+    Alcotest.(check string "dst untouched" "XX" (Bytes.to_string dst))
 end
 
 (* ==================== roundtrip ==================== *)
@@ -434,6 +623,12 @@ let () =
           test_case "suffix slice" `Quick
             Test_encode_substring.test_suffix_slice;
           test_case "single byte" `Quick Test_encode_substring.test_single_byte;
+          test_case "negative offset" `Quick
+            Test_encode_substring.test_negative_offset;
+          test_case "negative length" `Quick
+            Test_encode_substring.test_negative_length;
+          test_case "offset + length exceeds source" `Quick
+            Test_encode_substring.test_offset_plus_length_exceeds;
         ] );
       ( "encode_to_buffer",
         [
@@ -456,6 +651,14 @@ let () =
             Test_encode_substring_to_buffer.test_zero_length;
           test_case "appends to existing content" `Quick
             Test_encode_substring_to_buffer.test_appends_to_existing_content;
+          test_case "negative offset" `Quick
+            Test_encode_substring_to_buffer.test_negative_offset;
+          test_case "negative length" `Quick
+            Test_encode_substring_to_buffer.test_negative_length;
+          test_case "offset + length exceeds source" `Quick
+            Test_encode_substring_to_buffer.test_offset_plus_length_exceeds;
+          test_case "buffer untouched on error" `Quick
+            Test_encode_substring_to_buffer.test_buffer_untouched_on_error;
         ] );
       ( "encode_into",
         [
@@ -467,6 +670,20 @@ let () =
           test_case "source offset" `Quick Test_encode_into.test_source_offset;
           test_case "both offsets" `Quick Test_encode_into.test_both_offsets;
           test_case "single byte" `Quick Test_encode_into.test_single_byte;
+          test_case "negative source offset" `Quick
+            Test_encode_into.test_negative_source_offset;
+          test_case "negative length" `Quick
+            Test_encode_into.test_negative_length;
+          test_case "source too short" `Quick
+            Test_encode_into.test_source_too_short;
+          test_case "destination too small" `Quick
+            Test_encode_into.test_destination_too_small;
+          test_case "destination negative offset" `Quick
+            Test_encode_into.test_destination_negative_offset;
+          test_case "source error wins over destination error" `Quick
+            Test_encode_into.test_source_error_wins_over_destination_error;
+          test_case "destination untouched on error" `Quick
+            Test_encode_into.test_destination_untouched_on_error;
         ] );
       ( "decode",
         [
@@ -503,6 +720,14 @@ let () =
           test_case "odd length" `Quick Test_decode_substring.test_odd_length;
           test_case "invalid character" `Quick
             Test_decode_substring.test_invalid_character;
+          test_case "negative offset" `Quick
+            Test_decode_substring.test_negative_offset;
+          test_case "negative length" `Quick
+            Test_decode_substring.test_negative_length;
+          test_case "offset + length exceeds hex" `Quick
+            Test_decode_substring.test_offset_plus_length_exceeds;
+          test_case "range error wins over odd length" `Quick
+            Test_decode_substring.test_range_error_wins_over_odd_length;
         ] );
       ( "decode_to_buffer",
         [
@@ -533,6 +758,14 @@ let () =
             Test_decode_substring_to_buffer.test_odd_length;
           test_case "invalid character" `Quick
             Test_decode_substring_to_buffer.test_invalid_character;
+          test_case "negative offset" `Quick
+            Test_decode_substring_to_buffer.test_negative_offset;
+          test_case "negative length" `Quick
+            Test_decode_substring_to_buffer.test_negative_length;
+          test_case "offset + length exceeds hex" `Quick
+            Test_decode_substring_to_buffer.test_offset_plus_length_exceeds;
+          test_case "buffer untouched on error" `Quick
+            Test_decode_substring_to_buffer.test_buffer_untouched_on_error;
         ] );
       ( "decode_into",
         [
@@ -546,6 +779,19 @@ let () =
           test_case "single byte" `Quick Test_decode_into.test_single_byte;
           test_case "zero length" `Quick Test_decode_into.test_zero_length;
           test_case "odd length" `Quick Test_decode_into.test_odd_length;
+          test_case "negative hex offset" `Quick
+            Test_decode_into.test_negative_hex_offset;
+          test_case "negative length" `Quick
+            Test_decode_into.test_negative_length;
+          test_case "hex too short" `Quick Test_decode_into.test_hex_too_short;
+          test_case "destination too small" `Quick
+            Test_decode_into.test_destination_too_small;
+          test_case "destination negative offset" `Quick
+            Test_decode_into.test_destination_negative_offset;
+          test_case "odd length wins over destination error" `Quick
+            Test_decode_into.test_odd_length_wins_over_destination_error;
+          test_case "destination untouched on error" `Quick
+            Test_decode_into.test_destination_untouched_on_error;
         ] );
       ( "roundtrip",
         [
