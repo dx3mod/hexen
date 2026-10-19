@@ -1,0 +1,59 @@
+(** Hexadecimal encoding and decoding library.
+
+    The library provides fast and low-allocation utilities for encoding raw
+    binary strings into hexadecimal representations and decoding them. *)
+
+(** {2 Encode} *)
+
+val encode : ?uppercase:bool -> string -> string
+(** [encode ?uppercase source] encodes the [source] string to new hexadecimal
+    string. *)
+
+val encode_substring : ?uppercase:bool -> string -> int -> int -> string
+(** [encode_substring ?uppercase source off len] encodes the [source] substring
+    to new hexadecimal string. *)
+
+val encode_to_buffer : ?uppercase:bool -> string -> Buffer.t -> unit
+(** [encode_to_buffer ?uppercase source buffer] encodes the [source] string to
+    the [buffer]. *)
+
+val encode_substring_to_buffer :
+  ?uppercase:bool -> string -> int -> int -> Buffer.t -> unit
+(** [encode_substring_to_buffer ?uppercase source off len buffer] encodes the
+    [source] substring to the [buffer]. *)
+
+val encode_into :
+  ?uppercase:bool -> string -> int -> bytes -> int -> int -> unit
+(** [encode_into ?uppercase src src_off dst dst_off len] encodes the [src]
+    substring to the [dst] bytes range. *)
+
+(** {2 Decode} *)
+
+val decode : string -> string
+(** [decode hexadecimal] decodes the [hexadecimal] string to new binary string.
+
+    @raise Invalid_argument *)
+
+val decode_substring : string -> int -> int -> string
+(** [decode_substring hexadecimal off len] decodes the [hexadecimal] substring
+    to new binary string.
+
+    @raise Invalid_argument *)
+
+val decode_to_buffer : string -> Buffer.t -> unit
+(** [decode_to_buffer hexadecimal buffer] decodes the [hexadecimal] string to
+    the [buffer].
+
+    @raise Invalid_argument *)
+
+val decode_substring_to_buffer : string -> int -> int -> Buffer.t -> unit
+(** [decode_substring_to_buffer hexadecimal off len buffer] decodes the
+    [hexadecimal] substring to the [buffer].
+
+    @raise Invalid_argument *)
+
+val decode_into : string -> int -> bytes -> int -> int -> unit
+(** [decode_into sec src_off dst dst_off len] decodes the [src] hexadecimal
+    substring to the [dst] bytes range.
+
+    @raise Invalid_argument *)
