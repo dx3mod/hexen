@@ -29,7 +29,7 @@ let encode_into ?(uppercase = false) source source_off bytes bytes_off len =
     Bytes.set bytes ((i * 2) + bytes_off + 1) hex_map.[char_code land 0x0F]
   done
 
-let encode_substring_to_buffer ?(uppercase = false) source off len buffer =
+let encode_substring_to_buffer ?(uppercase = false) buffer source off len =
   check_source_range source off len;
 
   let hex_map = if uppercase then uppercase_hex_map else lowercase_hex_map in
@@ -40,8 +40,8 @@ let encode_substring_to_buffer ?(uppercase = false) source off len buffer =
     Buffer.add_char buffer hex_map.[char_code land 0x0F]
   done
 
-let encode_to_buffer ?uppercase source buffer =
-  encode_substring_to_buffer ?uppercase source 0 (String.length source) buffer
+let encode_to_buffer ?uppercase buffer source =
+  encode_substring_to_buffer ?uppercase buffer source 0 (String.length source)
 
 let encode_substring ?uppercase source off len =
   check_source_range source off len;
@@ -81,7 +81,7 @@ let decode_into hex hex_off bytes bytes_off len =
     end
     hex hex_off len
 
-let decode_substring_to_buffer hex off len buffer =
+let decode_substring_to_buffer buffer hex off len =
   check_hex_range hex off len;
   if len mod 2 <> 0 then invalid_arg "leftover byte in hex string";
 
@@ -92,8 +92,8 @@ let decode_substring_to_buffer hex off len buffer =
     end
     hex off len
 
-let decode_to_buffer hex buffer =
-  decode_substring_to_buffer hex 0 (String.length hex) buffer
+let decode_to_buffer buffer hex =
+  decode_substring_to_buffer buffer hex 0 (String.length hex)
 
 let decode_substring hex off len =
   check_hex_range hex off len;

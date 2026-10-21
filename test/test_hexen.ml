@@ -67,7 +67,6 @@ module Test_encode_substring = struct
   let test_single_byte () =
     Alcotest.(check string "single" "6c" (Hexen.encode_substring "hello" 2 1))
 
-  (* NEW: проверки диапазона источника *)
   let test_negative_offset () =
     Alcotest.(
       check_raises "neg off" (Invalid_argument "source range out of bounds")
@@ -88,29 +87,29 @@ end
 module Test_encode_to_buffer = struct
   let test_empty_into_empty_buffer () =
     let buf = Buffer.create 16 in
-    Hexen.encode_to_buffer "" buf;
+    Hexen.encode_to_buffer buf "";
     Alcotest.(check string "empty" "" (Buffer.contents buf))
 
   let test_simple () =
     let buf = Buffer.create 16 in
-    Hexen.encode_to_buffer "hi" buf;
+    Hexen.encode_to_buffer buf "hi";
     Alcotest.(check string "hi" "6869" (Buffer.contents buf))
 
   let test_uppercase () =
     let buf = Buffer.create 16 in
-    Hexen.encode_to_buffer ~uppercase:true "hi" buf;
+    Hexen.encode_to_buffer ~uppercase:true buf "hi";
     Alcotest.(check string "HI" "6869" (Buffer.contents buf))
 
   let test_appends_to_existing_content () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "prefix:";
-    Hexen.encode_to_buffer "hi" buf;
+    Hexen.encode_to_buffer buf "hi";
     Alcotest.(check string "appended" "prefix:6869" (Buffer.contents buf))
 
   let test_two_calls_append () =
     let buf = Buffer.create 16 in
-    Hexen.encode_to_buffer "a" buf;
-    Hexen.encode_to_buffer "b" buf;
+    Hexen.encode_to_buffer buf "a";
+    Hexen.encode_to_buffer buf "b";
     Alcotest.(check string "two calls" "6162" (Buffer.contents buf))
 end
 
@@ -118,50 +117,48 @@ end
 module Test_encode_substring_to_buffer = struct
   let test_middle_slice () =
     let buf = Buffer.create 16 in
-    Hexen.encode_substring_to_buffer "XXhelloYY" 2 5 buf;
+    Hexen.encode_substring_to_buffer buf "XXhelloYY" 2 5;
     Alcotest.(check string "substring" "68656c6c6f" (Buffer.contents buf))
 
   let test_uppercase () =
     let buf = Buffer.create 16 in
-    Hexen.encode_substring_to_buffer ~uppercase:true "hello" 0 5 buf;
+    Hexen.encode_substring_to_buffer ~uppercase:true buf "hello" 0 5;
     Alcotest.(check string "upper" "68656C6C6F" (Buffer.contents buf))
 
   let test_zero_length () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "keep";
-    Hexen.encode_substring_to_buffer "hello" 2 0 buf;
+    Hexen.encode_substring_to_buffer buf "hello" 2 0;
     Alcotest.(check string "no change" "keep" (Buffer.contents buf))
 
   let test_appends_to_existing_content () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "> ";
-    Hexen.encode_substring_to_buffer "XXabcYY" 2 3 buf;
+    Hexen.encode_substring_to_buffer buf "XXabcYY" 2 3;
     Alcotest.(check string "appended" "> 616263" (Buffer.contents buf))
 
-  (* NEW: проверки диапазона источника *)
   let test_negative_offset () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "neg off" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_substring_to_buffer "hello" (-1) 3 buf))
+        (fun () -> Hexen.encode_substring_to_buffer buf "hello" (-1) 3))
 
   let test_negative_length () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "neg len" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_substring_to_buffer "hello" 0 (-1) buf))
+        (fun () -> Hexen.encode_substring_to_buffer buf "hello" 0 (-1)))
 
   let test_offset_plus_length_exceeds () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "too long" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_substring_to_buffer "hello" 3 5 buf))
+        (fun () -> Hexen.encode_substring_to_buffer buf "hello" 3 5))
 
-  (* NEW: буфер не изменяется при ошибке *)
   let test_buffer_untouched_on_error () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "keep";
-    (try Hexen.encode_substring_to_buffer "hello" (-1) 3 buf
+    (try Hexen.encode_substring_to_buffer buf "hello" (-1) 3
      with Invalid_argument _ -> ());
     Alcotest.(check string "buffer untouched" "keep" (Buffer.contents buf))
 end
@@ -203,7 +200,6 @@ module Test_encode_into = struct
     Hexen.encode_into "XaX" 1 dst 0 1;
     Alcotest.(check string "one byte" "61" (Bytes.to_string dst))
 
-  (* NEW: диапазон источника *)
   let test_negative_source_offset () =
     let dst = Bytes.make 20 'X' in
     Alcotest.(
@@ -223,7 +219,6 @@ module Test_encode_into = struct
         (Invalid_argument "source range out of bounds") (fun () ->
           Hexen.encode_into "hi" 0 dst 0 3))
 
-  (* NEW: диапазон приёмника *)
   let test_destination_too_small () =
     let dst = Bytes.make 4 'X' in
     Alcotest.(
@@ -238,7 +233,6 @@ module Test_encode_into = struct
         (Invalid_argument "destination buffer too small") (fun () ->
           Hexen.encode_into "hello" 0 dst (-1) 5))
 
-  (* NEW: порядок проверок — источник раньше приёмника *)
   let test_source_error_wins_over_destination_error () =
     let dst = Bytes.make 4 'X' in
     Alcotest.(
@@ -246,7 +240,6 @@ module Test_encode_into = struct
         (Invalid_argument "source range out of bounds") (fun () ->
           Hexen.encode_into "hi" 0 dst 0 3))
 
-  (* NEW: dst не изменяется при ошибке *)
   let test_destination_untouched_on_error () =
     let dst = Bytes.make 4 'X' in
     (try Hexen.encode_into "hello" 0 dst 0 5 with Invalid_argument _ -> ());
@@ -337,7 +330,6 @@ module Test_decode_substring = struct
       check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
           ignore (Hexen.decode_substring "6z" 0 2)))
 
-  (* NEW: диапазон hex-строки *)
   let test_negative_offset () =
     Alcotest.(
       check_raises "neg off" (Invalid_argument "hex range out of bounds")
@@ -353,7 +345,6 @@ module Test_decode_substring = struct
       check_raises "too long" (Invalid_argument "hex range out of bounds")
         (fun () -> ignore (Hexen.decode_substring "68656c6c6f" 5 10)))
 
-  (* NEW: ошибка диапазона проверяется раньше нечётной длины *)
   let test_range_error_wins_over_odd_length () =
     Alcotest.(
       check_raises "range first" (Invalid_argument "hex range out of bounds")
@@ -364,104 +355,102 @@ end
 module Test_decode_to_buffer = struct
   let test_empty_into_empty_buffer () =
     let buf = Buffer.create 16 in
-    Hexen.decode_to_buffer "" buf;
+    Hexen.decode_to_buffer buf "";
     Alcotest.(check string "empty" "" (Buffer.contents buf))
 
   let test_simple () =
     let buf = Buffer.create 16 in
-    Hexen.decode_to_buffer "68656c6c6f" buf;
+    Hexen.decode_to_buffer buf "68656c6c6f";
     Alcotest.(check string "hello" "hello" (Buffer.contents buf))
 
   let test_appends_to_existing_content () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "prefix:";
-    Hexen.decode_to_buffer "68656c6c6f" buf;
+    Hexen.decode_to_buffer buf "68656c6c6f";
     Alcotest.(check string "appended" "prefix:hello" (Buffer.contents buf))
 
   let test_two_calls_append () =
     let buf = Buffer.create 16 in
-    Hexen.decode_to_buffer "61" buf;
-    Hexen.decode_to_buffer "62" buf;
+    Hexen.decode_to_buffer buf "61";
+    Hexen.decode_to_buffer buf "62";
     Alcotest.(check string "two calls" "ab" (Buffer.contents buf))
 
   let test_odd_length () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "odd" (Invalid_argument "leftover byte in hex string")
-        (fun () -> Hexen.decode_to_buffer "abc" buf))
+        (fun () -> Hexen.decode_to_buffer buf "abc"))
 
   let test_invalid_character () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
-          Hexen.decode_to_buffer "7z" buf))
+          Hexen.decode_to_buffer buf "7z"))
 end
 
 (* ==================== decode_substring_to_buffer ==================== *)
 module Test_decode_substring_to_buffer = struct
   let test_middle_slice () =
     let buf = Buffer.create 16 in
-    Hexen.decode_substring_to_buffer "XX68656c6c6fYY" 2 10 buf;
+    Hexen.decode_substring_to_buffer buf "XX68656c6c6fYY" 2 10;
     Alcotest.(check string "hello" "hello" (Buffer.contents buf))
 
   let test_prefix_slice () =
     let buf = Buffer.create 16 in
-    Hexen.decode_substring_to_buffer "68656c6c6f" 0 6 buf;
+    Hexen.decode_substring_to_buffer buf "68656c6c6f" 0 6;
     Alcotest.(check string "hel" "hel" (Buffer.contents buf))
 
   let test_suffix_slice () =
     let buf = Buffer.create 16 in
-    Hexen.decode_substring_to_buffer "68656c6c6f" 4 6 buf;
+    Hexen.decode_substring_to_buffer buf "68656c6c6f" 4 6;
     Alcotest.(check string "llo" "llo" (Buffer.contents buf))
 
   let test_zero_length () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "keep";
-    Hexen.decode_substring_to_buffer "68656c6c6f" 0 0 buf;
+    Hexen.decode_substring_to_buffer buf "68656c6c6f" 0 0;
     Alcotest.(check string "no change" "keep" (Buffer.contents buf))
 
   let test_appends_to_existing_content () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "> ";
-    Hexen.decode_substring_to_buffer "616263" 0 6 buf;
+    Hexen.decode_substring_to_buffer buf "616263" 0 6;
     Alcotest.(check string "appended" "> abc" (Buffer.contents buf))
 
   let test_odd_length () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "odd" (Invalid_argument "leftover byte in hex string")
-        (fun () -> Hexen.decode_substring_to_buffer "abc" 0 3 buf))
+        (fun () -> Hexen.decode_substring_to_buffer buf "abc" 0 3))
 
   let test_invalid_character () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
-          Hexen.decode_substring_to_buffer "7z" 0 2 buf))
+          Hexen.decode_substring_to_buffer buf "7z" 0 2))
 
-  (* NEW: диапазон hex-строки *)
   let test_negative_offset () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "neg off" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_substring_to_buffer "68656c6c6f" (-1) 4 buf))
+        (fun () -> Hexen.decode_substring_to_buffer buf "68656c6c6f" (-1) 4))
 
   let test_negative_length () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "neg len" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_substring_to_buffer "68656c6c6f" 0 (-2) buf))
+        (fun () -> Hexen.decode_substring_to_buffer buf "68656c6c6f" 0 (-2)))
 
   let test_offset_plus_length_exceeds () =
     let buf = Buffer.create 16 in
     Alcotest.(
       check_raises "too long" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_substring_to_buffer "68656c6c6f" 5 10 buf))
+        (fun () -> Hexen.decode_substring_to_buffer buf "68656c6c6f" 5 10))
 
-  (* NEW: буфер не изменяется при ошибке *)
   let test_buffer_untouched_on_error () =
     let buf = Buffer.create 16 in
     Buffer.add_string buf "keep";
-    (try Hexen.decode_substring_to_buffer "68656c6c6f" (-1) 4 buf
+    (try Hexen.decode_substring_to_buffer buf "68656c6c6f" (-1) 4
      with Invalid_argument _ -> ());
     Alcotest.(check string "buffer untouched" "keep" (Buffer.contents buf))
 end
@@ -509,7 +498,6 @@ module Test_decode_into = struct
       check_raises "odd" (Invalid_argument "leftover byte in hex string")
         (fun () -> Hexen.decode_into "abc" 0 dst 0 3))
 
-  (* NEW: диапазон hex-строки *)
   let test_negative_hex_offset () =
     let dst = Bytes.make 10 'X' in
     Alcotest.(
@@ -528,7 +516,6 @@ module Test_decode_into = struct
       check_raises "hex too short" (Invalid_argument "hex range out of bounds")
         (fun () -> Hexen.decode_into "68" 0 dst 0 4))
 
-  (* NEW: диапазон приёмника *)
   let test_destination_too_small () =
     let dst = Bytes.make 2 'X' in
     Alcotest.(
@@ -543,14 +530,12 @@ module Test_decode_into = struct
         (Invalid_argument "destination buffer too small") (fun () ->
           Hexen.decode_into "68656c6c6f" 0 dst (-1) 10))
 
-  (* NEW: порядок проверок — чётность len раньше ёмкости dst *)
   let test_odd_length_wins_over_destination_error () =
     let dst = Bytes.make 1 'X' in
     Alcotest.(
       check_raises "odd first" (Invalid_argument "leftover byte in hex string")
         (fun () -> Hexen.decode_into "abc" 0 dst 0 3))
 
-  (* NEW: dst не изменяется при ошибке *)
   let test_destination_untouched_on_error () =
     let dst = Bytes.make 2 'X' in
     (try Hexen.decode_into "68656c6c6f" 0 dst 0 10

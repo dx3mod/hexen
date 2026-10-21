@@ -32,8 +32,8 @@ Also, Hexen provides functions to encode and decode strings or substrings direct
 ```ocaml
 let buffer = Buffer.create 16 in
 
-Hexen.encode_to_buffer "Hello" buffer;
-Hexen.encode_substring_to_buffer "Hello World" 5 6 buffer;
+Hexen.encode_to_buffer buffer "Hello";
+Hexen.encode_substring_to_buffer buffer "Hello World" 5 6;
 
 let bytes = Bytes.create 12 in 
 Hexen.decode_into (Buffer.contents buffer) 0 bytes 0 22;

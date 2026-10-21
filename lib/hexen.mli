@@ -17,15 +17,15 @@ val encode_substring : ?uppercase:bool -> string -> int -> int -> string
 
     @raise Invalid_argument *)
 
-val encode_to_buffer : ?uppercase:bool -> string -> Buffer.t -> unit
-(** [encode_to_buffer ?uppercase source buffer] encodes the [source] string to
+val encode_to_buffer : ?uppercase:bool -> Buffer.t -> string -> unit
+(** [encode_to_buffer ?uppercase buffer source] encodes the [source] string to
     the [buffer].
 
     @raise Invalid_argument *)
 
 val encode_substring_to_buffer :
-  ?uppercase:bool -> string -> int -> int -> Buffer.t -> unit
-(** [encode_substring_to_buffer ?uppercase source off len buffer] encodes the
+  ?uppercase:bool -> Buffer.t -> string -> int -> int -> unit
+(** [encode_substring_to_buffer ?uppercase buffer source off len] encodes the
     [source] substring to the [buffer].
 
     @raise Invalid_argument *)
@@ -50,14 +50,14 @@ val decode_substring : string -> int -> int -> string
 
     @raise Invalid_argument *)
 
-val decode_to_buffer : string -> Buffer.t -> unit
-(** [decode_to_buffer hexadecimal buffer] decodes the [hexadecimal] string to
+val decode_to_buffer : Buffer.t -> string -> unit
+(** [decode_to_buffer buffer hexadecimal] decodes the [hexadecimal] string to
     the [buffer].
 
     @raise Invalid_argument *)
 
-val decode_substring_to_buffer : string -> int -> int -> Buffer.t -> unit
-(** [decode_substring_to_buffer hexadecimal off len buffer] decodes the
+val decode_substring_to_buffer : Buffer.t -> string -> int -> int -> unit
+(** [decode_substring_to_buffer buffer hexadecimal off len] decodes the
     [hexadecimal] substring to the [buffer].
 
     @raise Invalid_argument *)
