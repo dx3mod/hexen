@@ -1,106 +1,131 @@
+(** Note.
+
+    This code primarily uses "unsafe" functions to increase performance by
+    avoiding excessive overhead costs. It is dangerous! *)
+
 let lowercase_hex_map = "0123456789abcdef"
 let uppercase_hex_map = "0123456789ABCDEF"
-let required_length_for_encode len = len * 2
-let required_length_for_decode len = len / 2
 
-let check_source_range s off len =
-  (* Range checks. Negatives are checked before the upper bound so that the
-   subtraction [length - off] cannot wrap around on very large [len]. *)
-  if off < 0 || len < 0 || off > String.length s - len then
-    invalid_arg "source range out of bounds"
+(* Utils *)
 
-let check_hex_range s off len =
-  if off < 0 || len < 0 || off > String.length s - len then
-    invalid_arg "hex range out of bounds"
+let[@inline] required_length_for_encode len = len * 2
+let[@inline] required_length_for_decode len = len / 2
 
-let check_destination_range b off len =
-  if off < 0 || len < 0 || off > Bytes.length b - len then
-    invalid_arg "destination buffer too small"
+let[@inline] check_range src_len off len =
+  if off < 0 || len < 0 || len > src_len - off then
+    invalid_arg "hexen: invalid buffer ranges"
 
-let encode_into ?(uppercase = false) source source_off bytes bytes_off len =
-  check_source_range source source_off len;
-  check_destination_range bytes bytes_off (required_length_for_encode len);
+let[@inline] check_leftover len =
+  if len mod 2 <> 0 then invalid_arg "hexen: leftover byte in hex string"
+
+(* Encoding *)
+
+let encode_into ?(uppercase = false) src src_off dst dst_off len =
+  check_range (String.length src) src_off len;
+  check_range (Bytes.length dst) dst_off (required_length_for_encode len);
 
   let hex_map = if uppercase then uppercase_hex_map else lowercase_hex_map in
 
   for i = 0 to len - 1 do
-    let char_code = int_of_char source.[i + source_off] in
-    Bytes.set bytes ((i * 2) + bytes_off) hex_map.[char_code lsr 4];
-    Bytes.set bytes ((i * 2) + bytes_off + 1) hex_map.[char_code land 0x0F]
+    let char_code = int_of_char @@ String.unsafe_get src (i + src_off) in
+    let i' = (i * 2) + dst_off in
+
+    let hex_hi = String.unsafe_get hex_map (char_code lsr 4)
+    and hex_lo = String.unsafe_get hex_map (char_code land 0x0F) in
+
+    Bytes.unsafe_set dst i' hex_hi;
+    Bytes.unsafe_set dst (succ i') hex_lo
   done
 
-let encode_substring_to_buffer ?(uppercase = false) buffer source off len =
-  check_source_range source off len;
+let encode_substring_to_buffer ?(uppercase = false) buffer src src_off len =
+  check_range (String.length src) src_off len;
 
   let hex_map = if uppercase then uppercase_hex_map else lowercase_hex_map in
 
   for i = 0 to len - 1 do
-    let char_code = int_of_char source.[i + off] in
-    Buffer.add_char buffer hex_map.[char_code lsr 4];
-    Buffer.add_char buffer hex_map.[char_code land 0x0F]
+    let char_code = int_of_char @@ String.unsafe_get src (i + src_off) in
+
+    let hex_hi = String.unsafe_get hex_map (char_code lsr 4)
+    and hex_lo = String.unsafe_get hex_map (char_code land 0x0F) in
+
+    Buffer.add_char buffer hex_hi;
+    Buffer.add_char buffer hex_lo
   done
 
 let encode_to_buffer ?uppercase buffer source =
   encode_substring_to_buffer ?uppercase buffer source 0 (String.length source)
 
 let encode_substring ?uppercase source off len =
-  check_source_range source off len;
-  let bytes = Bytes.create (required_length_for_encode len) in
-  encode_into ?uppercase source off bytes 0 len;
-  Bytes.unsafe_to_string bytes
+  match len with
+  | 0 -> ""
+  | _ ->
+      let bytes = Bytes.create (required_length_for_encode len) in
+      encode_into ?uppercase source off bytes 0 len;
+      Bytes.unsafe_to_string bytes
 
 let encode ?uppercase source =
   encode_substring ?uppercase source 0 (String.length source)
+
+(* Decoding *)
 
 let int_of_hex_digit ch =
   let char_code = int_of_char ch in
   match ch with
   | '0' .. '9' -> char_code - 0x30
-  | 'A' .. 'F' -> char_code - 0x41 + 10
-  | 'a' .. 'f' -> char_code - 0x61 + 10
-  | ch -> invalid_arg Printf.(sprintf "bad character %C" ch)
+  | 'A' .. 'F' -> char_code - 0x37 (* 0x41 - 10 *)
+  | 'a' .. 'f' -> char_code - 0x57 (* 0x61 - 10 *)
+  | _ -> invalid_arg "hexen: bad character in hex string"
 
-let iter_by_hex_pair f hex off len =
-  let rec loop i =
-    if i < len then begin
-      f i hex.[i + off] hex.[succ i + off];
-      loop (i + 2)
-    end
-  in
-  loop 0
+let hex_lookup_table =
+  "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\xff\xff\xff\xff\xff\xff\xff\x0a\x0b\x0c\x0d\x0e\x0f\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x0a\x0b\x0c\x0d\x0e\x0f\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
 
-let decode_into hex hex_off bytes bytes_off len =
-  check_hex_range hex hex_off len;
-  if len mod 2 <> 0 then invalid_arg "leftover byte in hex string";
-  check_destination_range bytes bytes_off (required_length_for_decode len);
+let decode_into src src_off dst dst_off len =
+  check_leftover len;
+  check_range (String.length src) src_off len;
+  check_range (Bytes.length dst) dst_off (required_length_for_decode len);
 
-  iter_by_hex_pair
-    begin fun i hi lo ->
-      (int_of_hex_digit hi lsl 4) lor int_of_hex_digit lo
-      |> Bytes.set_uint8 bytes ((i / 2) + bytes_off)
-    end
-    hex hex_off len
+  let error_acc = ref 0 in
 
-let decode_substring_to_buffer buffer hex off len =
-  check_hex_range hex off len;
-  if len mod 2 <> 0 then invalid_arg "leftover byte in hex string";
+  for i = 0 to required_length_for_decode len - 1 do
+    let i_src = (i * 2) + src_off in
 
-  iter_by_hex_pair
-    begin fun _ hi lo ->
-      (int_of_hex_digit hi lsl 4) lor int_of_hex_digit lo
-      |> Buffer.add_uint8 buffer
-    end
-    hex off len
+    let hex_hi = int_of_char @@ String.unsafe_get src i_src in
+    let hex_lo = int_of_char @@ String.unsafe_get src (i_src + 1) in
+
+    let hi = int_of_char @@ String.unsafe_get hex_lookup_table hex_hi in
+    let lo = int_of_char @@ String.unsafe_get hex_lookup_table hex_lo in
+
+    error_acc := !error_acc lor hi lor lo;
+
+    Bytes.unsafe_set dst (i + dst_off) (Obj.magic ((hi lsl 4) lor lo))
+  done;
+
+  if !error_acc = 255 then invalid_arg "hexen: bad character in hex string"
+
+let decode_substring_to_buffer buffer src src_off len =
+  check_leftover len;
+  check_range (String.length src) src_off len;
+
+  for i = 0 to required_length_for_decode len - 1 do
+    let i_src = (i * 2) + src_off in
+
+    let hex_hi = String.unsafe_get src i_src
+    and hex_lo = String.unsafe_get src (succ i_src) in
+
+    let hi = int_of_hex_digit hex_hi lsl 4 and lo = int_of_hex_digit hex_lo in
+
+    Buffer.add_uint8 buffer (hi lor lo)
+  done
 
 let decode_to_buffer buffer hex =
   decode_substring_to_buffer buffer hex 0 (String.length hex)
 
 let decode_substring hex off len =
-  check_hex_range hex off len;
-  if len mod 2 <> 0 then invalid_arg "leftover byte in hex string";
-
-  let bytes = Bytes.create (required_length_for_decode len) in
-  decode_into hex off bytes 0 len;
-  Bytes.unsafe_to_string bytes
+  match len with
+  | 0 -> ""
+  | _ ->
+      let bytes = Bytes.create (required_length_for_decode len) in
+      decode_into hex off bytes 0 len;
+      Bytes.unsafe_to_string bytes
 
 let decode hex = decode_substring hex 0 (String.length hex)

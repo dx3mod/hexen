@@ -7,9 +7,7 @@
 
 val encode : ?uppercase:bool -> string -> string
 (** [encode ?uppercase source] encodes the [source] string to new hexadecimal
-    string.
-
-    @raise Invalid_argument *)
+    string. *)
 
 val encode_substring : ?uppercase:bool -> string -> int -> int -> string
 (** [encode_substring ?uppercase source off len] encodes the [source] substring

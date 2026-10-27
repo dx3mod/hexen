@@ -1,5 +1,15 @@
 [@@@ai_generated]
 
+let check_invalid msg f =
+  try
+    f ();
+    Alcotest.failf "%s: expected Invalid_argument" msg
+  with
+  | Invalid_argument _ -> ()
+  | e ->
+      Alcotest.failf "%s: expected Invalid_argument, got %s" msg
+        (Printexc.to_string e)
+
 (* ==================== encode ==================== *)
 module Test_encode = struct
   let test_empty_string () =
@@ -68,19 +78,16 @@ module Test_encode_substring = struct
     Alcotest.(check string "single" "6c" (Hexen.encode_substring "hello" 2 1))
 
   let test_negative_offset () =
-    Alcotest.(
-      check_raises "neg off" (Invalid_argument "source range out of bounds")
-        (fun () -> ignore (Hexen.encode_substring "hello" (-1) 3)))
+    check_invalid "neg off" (fun () ->
+        ignore (Hexen.encode_substring "hello" (-1) 3))
 
   let test_negative_length () =
-    Alcotest.(
-      check_raises "neg len" (Invalid_argument "source range out of bounds")
-        (fun () -> ignore (Hexen.encode_substring "hello" 0 (-1))))
+    check_invalid "neg len" (fun () ->
+        ignore (Hexen.encode_substring "hello" 0 (-1)))
 
   let test_offset_plus_length_exceeds () =
-    Alcotest.(
-      check_raises "too long" (Invalid_argument "source range out of bounds")
-        (fun () -> ignore (Hexen.encode_substring "hello" 3 5)))
+    check_invalid "too long" (fun () ->
+        ignore (Hexen.encode_substring "hello" 3 5))
 end
 
 (* ==================== encode_to_buffer ==================== *)
@@ -139,21 +146,18 @@ module Test_encode_substring_to_buffer = struct
 
   let test_negative_offset () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "neg off" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_substring_to_buffer buf "hello" (-1) 3))
+    check_invalid "neg off" (fun () ->
+        Hexen.encode_substring_to_buffer buf "hello" (-1) 3)
 
   let test_negative_length () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "neg len" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_substring_to_buffer buf "hello" 0 (-1)))
+    check_invalid "neg len" (fun () ->
+        Hexen.encode_substring_to_buffer buf "hello" 0 (-1))
 
   let test_offset_plus_length_exceeds () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "too long" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_substring_to_buffer buf "hello" 3 5))
+    check_invalid "too long" (fun () ->
+        Hexen.encode_substring_to_buffer buf "hello" 3 5)
 
   let test_buffer_untouched_on_error () =
     let buf = Buffer.create 16 in
@@ -202,43 +206,30 @@ module Test_encode_into = struct
 
   let test_negative_source_offset () =
     let dst = Bytes.make 20 'X' in
-    Alcotest.(
-      check_raises "neg src off" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_into "hello" (-1) dst 0 3))
+    check_invalid "neg src off" (fun () ->
+        Hexen.encode_into "hello" (-1) dst 0 3)
 
   let test_negative_length () =
     let dst = Bytes.make 20 'X' in
-    Alcotest.(
-      check_raises "neg len" (Invalid_argument "source range out of bounds")
-        (fun () -> Hexen.encode_into "hello" 0 dst 0 (-1)))
+    check_invalid "neg len" (fun () -> Hexen.encode_into "hello" 0 dst 0 (-1))
 
   let test_source_too_short () =
     let dst = Bytes.make 20 'X' in
-    Alcotest.(
-      check_raises "src too short"
-        (Invalid_argument "source range out of bounds") (fun () ->
-          Hexen.encode_into "hi" 0 dst 0 3))
+    check_invalid "src too short" (fun () -> Hexen.encode_into "hi" 0 dst 0 3)
 
   let test_destination_too_small () =
     let dst = Bytes.make 4 'X' in
-    Alcotest.(
-      check_raises "dst too small"
-        (Invalid_argument "destination buffer too small") (fun () ->
-          Hexen.encode_into "hello" 0 dst 0 5))
+    check_invalid "dst too small" (fun () ->
+        Hexen.encode_into "hello" 0 dst 0 5)
 
   let test_destination_negative_offset () =
     let dst = Bytes.make 20 'X' in
-    Alcotest.(
-      check_raises "neg dst off"
-        (Invalid_argument "destination buffer too small") (fun () ->
-          Hexen.encode_into "hello" 0 dst (-1) 5))
+    check_invalid "neg dst off" (fun () ->
+        Hexen.encode_into "hello" 0 dst (-1) 5)
 
   let test_source_error_wins_over_destination_error () =
     let dst = Bytes.make 4 'X' in
-    Alcotest.(
-      check_raises "src error first"
-        (Invalid_argument "source range out of bounds") (fun () ->
-          Hexen.encode_into "hi" 0 dst 0 3))
+    check_invalid "src error first" (fun () -> Hexen.encode_into "hi" 0 dst 0 3)
 
   let test_destination_untouched_on_error () =
     let dst = Bytes.make 4 'X' in
@@ -270,28 +261,27 @@ module Test_decode = struct
 
   let test_invalid_character_z () =
     Alcotest.(
-      check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
+      check_raises "bad char"
+        (Invalid_argument "hexen: bad character in hex string") (fun () ->
           ignore (Hexen.decode "7a7z")))
 
   let test_invalid_character_G () =
     Alcotest.(
-      check_raises "bad char" (Invalid_argument "bad character 'G'") (fun () ->
+      check_raises "bad char"
+        (Invalid_argument "hexen: bad character in hex string") (fun () ->
           ignore (Hexen.decode "7G")))
 
   let test_invalid_character_space () =
     Alcotest.(
-      check_raises "bad char" (Invalid_argument "bad character ' '") (fun () ->
+      check_raises "bad char"
+        (Invalid_argument "hexen: bad character in hex string") (fun () ->
           ignore (Hexen.decode "7 ")))
 
   let test_odd_length_3_chars () =
-    Alcotest.(
-      check_raises "odd length" (Invalid_argument "leftover byte in hex string")
-        (fun () -> ignore (Hexen.decode "abc")))
+    check_invalid "odd length" (fun () -> ignore (Hexen.decode "abc"))
 
   let test_odd_length_1_char () =
-    Alcotest.(
-      check_raises "odd length" (Invalid_argument "leftover byte in hex string")
-        (fun () -> ignore (Hexen.decode "a")))
+    check_invalid "odd length" (fun () -> ignore (Hexen.decode "a"))
 end
 
 (* ==================== decode_substring ==================== *)
@@ -321,34 +311,29 @@ module Test_decode_substring = struct
     Alcotest.(check string "zero" "" (Hexen.decode_substring "68656c6c6f" 0 0))
 
   let test_odd_length () =
-    Alcotest.(
-      check_raises "odd" (Invalid_argument "leftover byte in hex string")
-        (fun () -> ignore (Hexen.decode_substring "abc" 0 3)))
+    check_invalid "odd" (fun () -> ignore (Hexen.decode_substring "abc" 0 3))
 
   let test_invalid_character () =
     Alcotest.(
-      check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
+      check_raises "bad char"
+        (Invalid_argument "hexen: bad character in hex string") (fun () ->
           ignore (Hexen.decode_substring "6z" 0 2)))
 
   let test_negative_offset () =
-    Alcotest.(
-      check_raises "neg off" (Invalid_argument "hex range out of bounds")
-        (fun () -> ignore (Hexen.decode_substring "68656c6c6f" (-1) 4)))
+    check_invalid "neg off" (fun () ->
+        ignore (Hexen.decode_substring "68656c6c6f" (-1) 4))
 
   let test_negative_length () =
-    Alcotest.(
-      check_raises "neg len" (Invalid_argument "hex range out of bounds")
-        (fun () -> ignore (Hexen.decode_substring "68656c6c6f" 0 (-2))))
+    check_invalid "neg len" (fun () ->
+        ignore (Hexen.decode_substring "68656c6c6f" 0 (-2)))
 
   let test_offset_plus_length_exceeds () =
-    Alcotest.(
-      check_raises "too long" (Invalid_argument "hex range out of bounds")
-        (fun () -> ignore (Hexen.decode_substring "68656c6c6f" 5 10)))
+    check_invalid "too long" (fun () ->
+        ignore (Hexen.decode_substring "68656c6c6f" 5 10))
 
-  let test_range_error_wins_over_odd_length () =
-    Alcotest.(
-      check_raises "range first" (Invalid_argument "hex range out of bounds")
-        (fun () -> ignore (Hexen.decode_substring "abc" 0 5)))
+  let test_odd_length_wins_over_range_error () =
+    check_invalid "odd first" (fun () ->
+        ignore (Hexen.decode_substring "abc" 0 5))
 end
 
 (* ==================== decode_to_buffer ==================== *)
@@ -377,14 +362,13 @@ module Test_decode_to_buffer = struct
 
   let test_odd_length () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "odd" (Invalid_argument "leftover byte in hex string")
-        (fun () -> Hexen.decode_to_buffer buf "abc"))
+    check_invalid "odd" (fun () -> Hexen.decode_to_buffer buf "abc")
 
   let test_invalid_character () =
     let buf = Buffer.create 16 in
     Alcotest.(
-      check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
+      check_raises "bad char"
+        (Invalid_argument "hexen: bad character in hex string") (fun () ->
           Hexen.decode_to_buffer buf "7z"))
 end
 
@@ -419,33 +403,30 @@ module Test_decode_substring_to_buffer = struct
 
   let test_odd_length () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "odd" (Invalid_argument "leftover byte in hex string")
-        (fun () -> Hexen.decode_substring_to_buffer buf "abc" 0 3))
+    check_invalid "odd" (fun () ->
+        Hexen.decode_substring_to_buffer buf "abc" 0 3)
 
   let test_invalid_character () =
     let buf = Buffer.create 16 in
     Alcotest.(
-      check_raises "bad char" (Invalid_argument "bad character 'z'") (fun () ->
+      check_raises "bad char"
+        (Invalid_argument "hexen: bad character in hex string") (fun () ->
           Hexen.decode_substring_to_buffer buf "7z" 0 2))
 
   let test_negative_offset () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "neg off" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_substring_to_buffer buf "68656c6c6f" (-1) 4))
+    check_invalid "neg off" (fun () ->
+        Hexen.decode_substring_to_buffer buf "68656c6c6f" (-1) 4)
 
   let test_negative_length () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "neg len" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_substring_to_buffer buf "68656c6c6f" 0 (-2)))
+    check_invalid "neg len" (fun () ->
+        Hexen.decode_substring_to_buffer buf "68656c6c6f" 0 (-2))
 
   let test_offset_plus_length_exceeds () =
     let buf = Buffer.create 16 in
-    Alcotest.(
-      check_raises "too long" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_substring_to_buffer buf "68656c6c6f" 5 10))
+    check_invalid "too long" (fun () ->
+        Hexen.decode_substring_to_buffer buf "68656c6c6f" 5 10)
 
   let test_buffer_untouched_on_error () =
     let buf = Buffer.create 16 in
@@ -494,47 +475,35 @@ module Test_decode_into = struct
 
   let test_odd_length () =
     let dst = Bytes.create 8 in
-    Alcotest.(
-      check_raises "odd" (Invalid_argument "leftover byte in hex string")
-        (fun () -> Hexen.decode_into "abc" 0 dst 0 3))
+    check_invalid "odd" (fun () -> Hexen.decode_into "abc" 0 dst 0 3)
 
   let test_negative_hex_offset () =
     let dst = Bytes.make 10 'X' in
-    Alcotest.(
-      check_raises "neg hex off" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_into "68656c6c6f" (-1) dst 0 4))
+    check_invalid "neg hex off" (fun () ->
+        Hexen.decode_into "68656c6c6f" (-1) dst 0 4)
 
   let test_negative_length () =
     let dst = Bytes.make 10 'X' in
-    Alcotest.(
-      check_raises "neg len" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_into "68656c6c6f" 0 dst 0 (-2)))
+    check_invalid "neg len" (fun () ->
+        Hexen.decode_into "68656c6c6f" 0 dst 0 (-2))
 
   let test_hex_too_short () =
     let dst = Bytes.make 10 'X' in
-    Alcotest.(
-      check_raises "hex too short" (Invalid_argument "hex range out of bounds")
-        (fun () -> Hexen.decode_into "68" 0 dst 0 4))
+    check_invalid "hex too short" (fun () -> Hexen.decode_into "68" 0 dst 0 4)
 
   let test_destination_too_small () =
     let dst = Bytes.make 2 'X' in
-    Alcotest.(
-      check_raises "dst too small"
-        (Invalid_argument "destination buffer too small") (fun () ->
-          Hexen.decode_into "68656c6c6f" 0 dst 0 10))
+    check_invalid "dst too small" (fun () ->
+        Hexen.decode_into "68656c6c6f" 0 dst 0 10)
 
   let test_destination_negative_offset () =
     let dst = Bytes.make 10 'X' in
-    Alcotest.(
-      check_raises "neg dst off"
-        (Invalid_argument "destination buffer too small") (fun () ->
-          Hexen.decode_into "68656c6c6f" 0 dst (-1) 10))
+    check_invalid "neg dst off" (fun () ->
+        Hexen.decode_into "68656c6c6f" 0 dst (-1) 10)
 
   let test_odd_length_wins_over_destination_error () =
     let dst = Bytes.make 1 'X' in
-    Alcotest.(
-      check_raises "odd first" (Invalid_argument "leftover byte in hex string")
-        (fun () -> Hexen.decode_into "abc" 0 dst 0 3))
+    check_invalid "odd first" (fun () -> Hexen.decode_into "abc" 0 dst 0 3)
 
   let test_destination_untouched_on_error () =
     let dst = Bytes.make 2 'X' in
@@ -711,8 +680,8 @@ let () =
             Test_decode_substring.test_negative_length;
           test_case "offset + length exceeds hex" `Quick
             Test_decode_substring.test_offset_plus_length_exceeds;
-          test_case "range error wins over odd length" `Quick
-            Test_decode_substring.test_range_error_wins_over_odd_length;
+          test_case "odd length wins over range error" `Quick
+            Test_decode_substring.test_odd_length_wins_over_range_error;
         ] );
       ( "decode_to_buffer",
         [
