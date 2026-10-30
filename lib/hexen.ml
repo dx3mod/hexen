@@ -68,7 +68,7 @@ let encode ?uppercase source =
 
 (* Decoding *)
 
-let int_of_hex_digit ch =
+let[@inline] int_of_hex_digit ch =
   let char_code = int_of_char ch in
   match ch with
   | '0' .. '9' -> char_code - 0x30
